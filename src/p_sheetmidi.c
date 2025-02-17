@@ -1,6 +1,7 @@
 #include "include/m_pd.h"
 #include <string.h>  // Add this include
 #include <ctype.h>  // For isdigit()
+#include <stdlib.h>  // For rand()
 
 EXTERN void pd_init(t_pd *x);  // Add this declaration
 
@@ -65,6 +66,9 @@ static void print_parsed_sequence(t_p_sheetmidi *x);
 static t_chord_data parse_chord_symbol(t_symbol *sym);
 void p_sheetmidi_note(t_p_sheetmidi *x);  // Add this
 void p_sheetmidi_tick(t_p_sheetmidi *x);  // Add this
+void p_sheetmidi_root(t_p_sheetmidi *x);
+void p_sheetmidi_third(t_p_sheetmidi *x);
+void p_sheetmidi_fifth(t_p_sheetmidi *x);
 
 // Add this to store the last sequence for reparsing
 static t_atom *last_sequence = NULL;
@@ -359,6 +363,15 @@ EXTERN void p_sheetmidi_setup(void) {
                    (t_method)p_sheetmidi_note, 
                    gensym("note"), 0);
     class_addmethod(p_sheetmidi_class, 
+                   (t_method)p_sheetmidi_root, 
+                   gensym("root"), 0);
+    class_addmethod(p_sheetmidi_class, 
+                   (t_method)p_sheetmidi_third, 
+                   gensym("third"), 0);
+    class_addmethod(p_sheetmidi_class, 
+                   (t_method)p_sheetmidi_fifth, 
+                   gensym("fifth"), 0);
+    class_addmethod(p_sheetmidi_class, 
                    (t_method)p_sheetmidi_tick, 
                    gensym("tick"), 0);
     
@@ -499,29 +512,60 @@ static t_chord_data parse_chord_symbol(t_symbol *sym) {
     return chord;
 }
 
-// Add these message handlers
-void p_sheetmidi_note(t_p_sheetmidi *x) {
-    if (x->num_events == 0) return;
+// Helper function to get current event
+static t_chord_event* get_current_event(t_p_sheetmidi *x) {
+    if (x->num_events == 0) return NULL;
     
-    // Find which event corresponds to current_beat
     int beat_count = 0;
     int event_idx = 0;
     
-    // Count through events until we find the one containing current_beat
     while (beat_count + x->events[event_idx].duration <= x->current_beat) {
         beat_count += x->events[event_idx].duration;
         event_idx++;
         if (event_idx >= x->num_events) {
-            // Wrap around
             x->current_beat = 0;
             beat_count = 0;
             event_idx = 0;
         }
     }
     
-    // Output the root note of the current chord
-    t_float root_note = x->events[event_idx].parsed.root_offset;
-    outlet_float(x->note_outlet, root_note);
+    return &x->events[event_idx];
+}
+
+// Update note handler to play random interval
+void p_sheetmidi_note(t_p_sheetmidi *x) {
+    t_chord_event *ev = get_current_event(x);
+    if (!ev) return;
+    
+    // Pick random interval from the available ones
+    int random_idx = rand() % ev->parsed.num_intervals;
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[random_idx];
+    outlet_float(x->note_outlet, note);
+}
+
+// Add new handlers for specific intervals
+void p_sheetmidi_root(t_p_sheetmidi *x) {
+    t_chord_event *ev = get_current_event(x);
+    if (!ev) return;
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[0];  // Root is always first
+    outlet_float(x->note_outlet, note);
+}
+
+void p_sheetmidi_third(t_p_sheetmidi *x) {
+    t_chord_event *ev = get_current_event(x);
+    if (!ev || ev->parsed.num_intervals < 2) return;
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[1];  // Third is second
+    outlet_float(x->note_outlet, note);
+}
+
+void p_sheetmidi_fifth(t_p_sheetmidi *x) {
+    t_chord_event *ev = get_current_event(x);
+    if (!ev || ev->parsed.num_intervals < 3) return;
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[2];  // Fifth is third
+    outlet_float(x->note_outlet, note);
 }
 
 void p_sheetmidi_tick(t_p_sheetmidi *x) {
