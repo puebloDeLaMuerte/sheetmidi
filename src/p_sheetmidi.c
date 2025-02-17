@@ -1,5 +1,6 @@
 #include "include/m_pd.h"
 #include <string.h>  // Add this include
+#include <ctype.h>  // For isdigit()
 
 EXTERN void pd_init(t_pd *x);  // Add this declaration
 
@@ -11,9 +12,18 @@ typedef struct _p_sheetmidi_proxy {
     struct _p_sheetmidi *x;
 } t_p_sheetmidi_proxy;
 
+// Move this before any struct that uses it
+typedef struct _chord_data {
+    t_symbol *original;     // Original chord symbol
+    int root_offset;        // Semitones from C (0-11)
+    int intervals[12];      // Array of intervals in semitones
+    int num_intervals;      // Number of intervals used
+} t_chord_data;
+
 typedef struct _chord_event {
     t_symbol *chord;     // The chord symbol (like "C", "Dm7", etc.)
     int duration;        // Duration in beats (whole number of beats)
+    t_chord_data parsed; // Parsed chord data
 } t_chord_event;
 
 typedef struct _p_sheetmidi {
@@ -48,6 +58,7 @@ static void clear_events(t_p_sheetmidi *x);
 static void distribute_beats_in_bar(t_chord_event *events, int start_idx, int count, int time_sig);
 static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv);
 static void print_parsed_sequence(t_p_sheetmidi *x);
+static t_chord_data parse_chord_symbol(t_symbol *sym);
 
 // Add this to store the last sequence for reparsing
 static t_atom *last_sequence = NULL;
@@ -135,6 +146,7 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
             case TOKEN_CHORD:
                 x->events[current_event].chord = token.value;
                 x->events[current_event].duration = 1; // Start with 1 beat for the chord itself
+                x->events[current_event].parsed = parse_chord_symbol(token.value); // Parse the chord
                 chords_in_bar++;
                 current_event++;
                 dot_count = 0; // Reset dot count for new chord
@@ -199,8 +211,20 @@ static void print_parsed_sequence(t_p_sheetmidi *x) {
     post("SheetMidi: Parsed sequence (%d events, total duration: %d beats, signature: %d/%d):", 
          x->num_events, x->total_duration, (int)x->time_signature, 4);
     for (int i = 0; i < x->num_events; i++) {
-        post("  Event %d: %s (%d beats)", 
-             i + 1, x->events[i].chord->s_name, x->events[i].duration);
+        t_chord_event *ev = &x->events[i];
+        post("  Event %d: %s (%d beats) - root: %d, intervals:", 
+             i + 1, ev->chord->s_name, ev->duration, ev->parsed.root_offset);
+        
+        // Print intervals in a separate line for clarity
+        char intervals[128] = "";
+        int pos = 0;
+        for (int j = 0; j < ev->parsed.num_intervals; j++) {
+            pos += snprintf(intervals + pos, sizeof(intervals) - pos, 
+                          "%d%s", 
+                          ev->parsed.intervals[j],
+                          j < ev->parsed.num_intervals - 1 ? ", " : "");
+        }
+        post("    %s", intervals);
     }
 }
 
@@ -346,6 +370,115 @@ static token_t atom_to_token(t_atom *atom) {
     }
     
     return token;
+}
+
+static t_chord_data parse_chord_symbol(t_symbol *sym) {
+    t_chord_data chord = {
+        .original = sym,
+        .root_offset = 0,
+        .num_intervals = 0
+    };
+    memset(chord.intervals, -1, sizeof(chord.intervals));
+    
+    const char *str = sym->s_name;
+    int pos = 0;
+    
+    // 1. Parse root note (same as before)
+    switch(str[pos]) {
+        case 'C': chord.root_offset = 0; break;
+        case 'D': chord.root_offset = 2; break;
+        case 'E': chord.root_offset = 4; break;
+        case 'F': chord.root_offset = 5; break;
+        case 'G': chord.root_offset = 7; break;
+        case 'A': chord.root_offset = 9; break;
+        case 'B': chord.root_offset = 11; break;
+        default: return chord; // Invalid root
+    }
+    pos++;
+    
+    // Root modifier (same as before)
+    if (str[pos] == 'b') {
+        chord.root_offset = (chord.root_offset - 1 + 12) % 12;
+        pos++;
+    } else if (str[pos] == '#') {
+        chord.root_offset = (chord.root_offset + 1) % 12;
+        pos++;
+    }
+    
+    // Always add root note
+    chord.intervals[chord.num_intervals++] = 0;
+    
+    // 2. Check for minor indicator
+    int third = 4;  // Default to major third
+    int fifth = 7;  // Default to perfect fifth
+    if (str[pos] == 'm') {
+        third = 3;  // Minor third
+        pos++;
+    } else if (strncmp(&str[pos], "dim", 3) == 0) {
+        third = 3;  // Minor third
+        fifth = 6;  // Diminished fifth
+        pos += 3;
+    }
+    chord.intervals[chord.num_intervals++] = third;
+    chord.intervals[chord.num_intervals++] = fifth;
+    
+    // 3. Parse remaining intervals and modifications
+    while (str[pos] != '\0') {
+        int modifier = 0;
+        
+        // Handle modifiers
+        if (str[pos] == 'b') {
+            modifier = -1;
+            pos++;
+        } else if (str[pos] == '#') {
+            modifier = 1;
+            pos++;
+        } else if (strncmp(&str[pos], "maj", 3) == 0 || str[pos] == 'M') {
+            modifier = 1;
+            pos += (str[pos] == 'M' ? 1 : 3);
+        }
+        
+        // Parse each interval number separately
+        while (isdigit(str[pos])) {
+            int interval = str[pos] - '0';
+            pos++;
+            
+            // Handle two-digit intervals only if next char is also not a digit
+            if (isdigit(str[pos]) && !isdigit(str[pos + 1])) {
+                interval = interval * 10 + (str[pos] - '0');
+                pos++;
+            }
+            
+            // Convert interval number to semitones
+            int semitones;
+            switch(interval) {
+                case 5:  // Modify the fifth
+                    chord.intervals[2] = 7 + modifier;  // Modify existing fifth
+                    continue;
+                case 6:  // Special case for 6th
+                    semitones = 9 + modifier;
+                    break;
+                case 7:
+                    semitones = 10 + modifier;
+                    break;
+                case 9:
+                    semitones = 14 + modifier;
+                    break;
+                case 11:
+                    semitones = 17 + modifier;
+                    break;
+                case 13:
+                    semitones = 21 + modifier;
+                    break;
+                default:
+                    continue; // Invalid interval
+            }
+            
+            chord.intervals[chord.num_intervals++] = semitones;
+        }
+    }
+    
+    return chord;
 }
 
 
