@@ -37,6 +37,10 @@ typedef struct _p_sheetmidi {
     t_chord_event *events;  // Array of chord events
     int num_events;         // Number of events
     int total_duration;     // Total duration in beats
+    
+    // Playback members
+    t_outlet *note_outlet;     // Outlet for current note value
+    int current_beat;          // Current playback position in beats
 } t_p_sheetmidi;
 
 // Move type definitions to the top, after the includes and before any functions
@@ -59,6 +63,8 @@ static void distribute_beats_in_bar(t_chord_event *events, int start_idx, int co
 static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv);
 static void print_parsed_sequence(t_p_sheetmidi *x);
 static t_chord_data parse_chord_symbol(t_symbol *sym);
+void p_sheetmidi_note(t_p_sheetmidi *x);  // Add this
+void p_sheetmidi_tick(t_p_sheetmidi *x);  // Add this
 
 // Add this to store the last sequence for reparsing
 static t_atom *last_sequence = NULL;
@@ -292,6 +298,10 @@ void *p_sheetmidi_new(void) {
     x->num_events = 0;
     x->total_duration = 0;
     
+    // Initialize playback
+    x->current_beat = 0;
+    x->note_outlet = outlet_new(&x->x_obj, &s_float);
+    
     post("SheetMidi: new instance created");
     return (void *)x;
 }
@@ -343,6 +353,14 @@ EXTERN void p_sheetmidi_setup(void) {
     // Left inlet: only bang and explicitly ignore lists
     class_addbang(p_sheetmidi_class, p_sheetmidi_bang);
     class_addlist(p_sheetmidi_class, p_sheetmidi_list);
+    
+    // Add message methods
+    class_addmethod(p_sheetmidi_class, 
+                   (t_method)p_sheetmidi_note, 
+                   gensym("note"), 0);
+    class_addmethod(p_sheetmidi_class, 
+                   (t_method)p_sheetmidi_tick, 
+                   gensym("tick"), 0);
     
     post("SheetMidi: external loaded");
 }
@@ -479,6 +497,43 @@ static t_chord_data parse_chord_symbol(t_symbol *sym) {
     }
     
     return chord;
+}
+
+// Add these message handlers
+void p_sheetmidi_note(t_p_sheetmidi *x) {
+    if (x->num_events == 0) return;
+    
+    // Find which event corresponds to current_beat
+    int beat_count = 0;
+    int event_idx = 0;
+    
+    // Count through events until we find the one containing current_beat
+    while (beat_count + x->events[event_idx].duration <= x->current_beat) {
+        beat_count += x->events[event_idx].duration;
+        event_idx++;
+        if (event_idx >= x->num_events) {
+            // Wrap around
+            x->current_beat = 0;
+            beat_count = 0;
+            event_idx = 0;
+        }
+    }
+    
+    // Output the root note of the current chord
+    t_float root_note = x->events[event_idx].parsed.root_offset;
+    outlet_float(x->note_outlet, root_note);
+}
+
+void p_sheetmidi_tick(t_p_sheetmidi *x) {
+    if (x->num_events == 0) return;
+    
+    // Advance beat counter
+    x->current_beat++;
+    
+    // Check for wraparound
+    if (x->current_beat >= x->total_duration) {
+        x->current_beat = 0;
+    }
 }
 
 
