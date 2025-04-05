@@ -41,6 +41,7 @@ typedef struct _p_sheetmidi {
     
     // Playback members
     t_outlet *note_outlet;     // Outlet for current note value
+    t_outlet *debug_outlet;    // Outlet for chord symbols
     int current_beat;          // Current playback position in beats
 } t_p_sheetmidi;
 
@@ -305,6 +306,7 @@ void *p_sheetmidi_new(void) {
     // Initialize playback
     x->current_beat = 0;
     x->note_outlet = outlet_new(&x->x_obj, &s_float);
+    x->debug_outlet = outlet_new(&x->x_obj, &s_symbol);  // For chord symbols
     
     post("SheetMidi: new instance created");
     return (void *)x;
@@ -532,12 +534,20 @@ static t_chord_event* get_current_event(t_p_sheetmidi *x) {
     return &x->events[event_idx];
 }
 
+// Helper function to output debug info
+static void output_debug_chord(t_p_sheetmidi *x, t_chord_event *ev) {
+    if (ev && ev->chord) {
+        outlet_symbol(x->debug_outlet, ev->chord);
+    }
+}
+
 // Update note handler to play random interval
 void p_sheetmidi_note(t_p_sheetmidi *x) {
     t_chord_event *ev = get_current_event(x);
     if (!ev) return;
     
-    // Pick random interval from the available ones
+    output_debug_chord(x, ev);  // Output chord symbol first
+    
     int random_idx = rand() % ev->parsed.num_intervals;
     t_float note = ev->parsed.root_offset + ev->parsed.intervals[random_idx];
     outlet_float(x->note_outlet, note);
@@ -548,7 +558,9 @@ void p_sheetmidi_root(t_p_sheetmidi *x) {
     t_chord_event *ev = get_current_event(x);
     if (!ev) return;
     
-    t_float note = ev->parsed.root_offset + ev->parsed.intervals[0];  // Root is always first
+    output_debug_chord(x, ev);  // Output chord symbol first
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[0];
     outlet_float(x->note_outlet, note);
 }
 
@@ -556,7 +568,9 @@ void p_sheetmidi_third(t_p_sheetmidi *x) {
     t_chord_event *ev = get_current_event(x);
     if (!ev || ev->parsed.num_intervals < 2) return;
     
-    t_float note = ev->parsed.root_offset + ev->parsed.intervals[1];  // Third is second
+    output_debug_chord(x, ev);  // Output chord symbol first
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[1];
     outlet_float(x->note_outlet, note);
 }
 
@@ -564,7 +578,9 @@ void p_sheetmidi_fifth(t_p_sheetmidi *x) {
     t_chord_event *ev = get_current_event(x);
     if (!ev || ev->parsed.num_intervals < 3) return;
     
-    t_float note = ev->parsed.root_offset + ev->parsed.intervals[2];  // Fifth is third
+    output_debug_chord(x, ev);  // Output chord symbol first
+    
+    t_float note = ev->parsed.root_offset + ev->parsed.intervals[2];
     outlet_float(x->note_outlet, note);
 }
 
