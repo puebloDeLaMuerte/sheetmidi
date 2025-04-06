@@ -1,12 +1,16 @@
-#include "include/token_handler.h"
+#include "token_handler.h"
+#include "m_pd.h"
+#include "p_sheetmidi_types.h"
+#include "post_utils.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 token_t atom_to_token(t_atom *atom) {
     token_t token = {TOKEN_ERROR, NULL};
     
     if (atom->a_type != A_SYMBOL) {
-        post("SheetMidi: Got non-symbol atom");
+        info_post("SheetMidi: Got non-symbol atom");
         return token;
     }
     

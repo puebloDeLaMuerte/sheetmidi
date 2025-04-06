@@ -1,11 +1,15 @@
-#include "include/chord_data.h"
+#include "m_pd.h"
+#include "chord_data.h"
+#include "p_sheetmidi_types.h"
+#include "post_utils.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 void debug_print_chord(const char* prefix, const t_chord_data* chord) {
-    post("%s: Root: %d, Intervals:", prefix, chord->root_offset);
+    info_post("%s: Root: %d, Intervals:", prefix, chord->root_offset);
     for (int i = 0; i < chord->num_intervals; i++) {
-        post("  %d", chord->intervals[i]);
+        info_post("  %d", chord->intervals[i]);
     }
 }
 
@@ -19,24 +23,23 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
     
     const char *str = sym->s_name;
     
+    // Note: We can't use debug_post here since we don't have access to the t_p_sheetmidi instance
+    // This is a limitation we'll have to live with for this function
+    
     // Skip leading whitespace and non-printable characters
-    while (*str && (!isprint((unsigned char)*str) || isspace((unsigned char)*str))) str++;
+    while (*str && (!isprint((unsigned char)*str) || isspace((unsigned char)*str))) {
+        str++;
+    }
     
     // If string is empty after trimming
     if (!*str) {
-        post("SheetMidi: Empty chord symbol after trimming whitespace");
         return chord;
     }
-    
-    // Debug output
-    post("SheetMidi: Parsing chord '%s'", str);
     
     int pos = 0;
     
     // 1. Parse root note
     if (!isprint((unsigned char)str[pos])) {
-        post("SheetMidi: Invalid root note (non-printable character, ASCII %d) in chord '%s'", 
-             (int)(unsigned char)str[pos], str);
         return chord;
     }
     
@@ -49,12 +52,6 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
         case 'A': chord.root_offset = 9; break;
         case 'B': chord.root_offset = 11; break;
         default: 
-            if (!isprint((unsigned char)str[pos])) {
-                post("SheetMidi: Invalid root note (non-printable character, ASCII %d) in chord '%s'", 
-                     (int)(unsigned char)str[pos], str);
-            } else {
-                post("SheetMidi: Invalid root note '%c' in chord '%s'", str[pos], str);
-            }
             return chord;
     }
     pos++;
@@ -77,6 +74,19 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
     if (str[pos] == 'm') {
         third = 3;  // Minor third
         pos++;
+        // Check for 'min' or 'mi'
+        if (strncmp(&str[pos], "in", 2) == 0) {
+            pos += 2;
+        } else if (str[pos] == 'i') {
+            pos++;
+        } else if (str[pos] == 'a' && str[pos + 1] == 'j') {
+            // If we see 'maj', this is actually not a minor chord
+            third = 4;  // Revert to major third
+            pos--;  // Go back to 'm' to let the maj parsing handle it
+        }
+    } else if (str[pos] == 'M' && str[pos + 1] == 'I') {
+        third = 3;  // Minor third
+        pos += 2;
     } else if (strncmp(&str[pos], "dim", 3) == 0) {
         third = 3;  // Minor third
         fifth = 6;  // Diminished fifth
@@ -86,9 +96,14 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
     chord.intervals[chord.num_intervals++] = fifth;
     
     // 3. Parse remaining intervals and modifications
-    while (str[pos] != '\0') {
+    int loop_guard = 0;  // Safety counter to prevent infinite loops
+    while (str[pos] != '\0' && loop_guard < 100) {  // Add reasonable maximum iterations
+        loop_guard++;
+        
         // Skip any whitespace
-        while (str[pos] && isspace((unsigned char)str[pos])) pos++;
+        while (str[pos] && isspace((unsigned char)str[pos])) {
+            pos++;
+        }
         if (!str[pos]) break;
         
         int modifier = 0;
@@ -99,9 +114,13 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
         } else if (str[pos] == '#') {
             modifier = 1;
             pos++;
-        } else if (strncmp(&str[pos], "maj", 3) == 0 || str[pos] == 'M') {
+        } else if (strncmp(&str[pos], "maj", 3) == 0 || strncmp(&str[pos], "MAJ", 3) == 0 || 
+                   strncmp(&str[pos], "Maj", 3) == 0) {
             modifier = 1;
-            pos += (str[pos] == 'M' ? 1 : 3);
+            pos += 3;
+        } else if (strncmp(&str[pos], "MA", 2) == 0) {
+            modifier = 1;
+            pos += 2;
         }
         
         while (isdigit(str[pos])) {
@@ -137,11 +156,17 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
                     continue;
             }
             
+            if (chord.num_intervals >= 12) {
+                continue;
+            }
+            
             chord.intervals[chord.num_intervals++] = semitones;
         }
         
         // Skip any whitespace
-        while (str[pos] && isspace((unsigned char)str[pos])) pos++;
+        while (str[pos] && isspace((unsigned char)str[pos])) {
+            pos++;
+        }
     }
     
     return chord;
