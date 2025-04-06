@@ -58,6 +58,19 @@ void p_sheetmidi_proxy_anything(t_p_sheetmidi_proxy *p, t_symbol *s, int argc, t
         return;
     }
 
+    // Handle beat reset
+    if (s == gensym("beat")) {
+        if (argc > 0 && argv[0].a_type == A_FLOAT) {
+            t_float new_beat = atom_getfloat(&argv[0]);
+            if (p->x->total_duration > 0) {
+                // Wrap around using modulo
+                p->x->current_beat = ((int)new_beat % p->x->total_duration + p->x->total_duration) % p->x->total_duration;
+                debug_post(p->x, "SheetMidi DEBUG: Beat reset to %d", p->x->current_beat);
+            }
+        }
+        return;
+    }
+
     // For all other messages, tokenize and parse
     token_t *tokens = NULL;
     int num_tokens = 0;
