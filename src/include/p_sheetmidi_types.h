@@ -20,6 +20,7 @@ typedef struct _p_sheetmidi {
     t_chord_event *events;  // Array of chord events
     int num_events;         // Number of events
     int total_duration;     // Total duration in beats
+    int debug_enabled;      // Flag to control debug output
     
     // Playback members
     t_outlet *note_outlet;     // Outlet for current note value
