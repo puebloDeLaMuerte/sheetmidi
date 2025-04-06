@@ -1,6 +1,6 @@
 # SheetMidi
 
-A Pure Data external that converts a string (list in pd) of chord symbols into MIDI note numbers. SheetMidi allows you to create musical sequences by specifying chords and their durations, then play back specific chord tones or random notes from the current chord.
+A Pure Data external that converts a string (list in pd) of chord symbols into MIDI note numbers. Specify Chords, bars, chord-durations in beats and get midi note numbers for root, third, fifth, allnotes and randomnote from the current chord. advance time by sending '[tick(' to the object. May the algorithmic composing begin!)]
 
 ## Features
 
@@ -16,23 +16,27 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 
 #### Main Inlet (Left)
 
-- **bang**: Outputs information about the current chord sequence
-- **note**: Outputs a random note from the current chord
-- **root**: Outputs the root note of the current chord
-- **third**: Outputs the third note of the current chord
-- **fifth**: Outputs the fifth note of the current chord
-- **tick**: Advances the beat counter (typically connected to a metro)
+- `[bang(`: Outputs information about the current chord sequence
+- `[note(`: Outputs a random note from the current chord
+- `[root(`: Outputs the root note of the current chord
+- `[third(`: Outputs the third note of the current chord
+- `[fifth(`: Outputs the fifth note of the current chord
+- `[tick(`: Advances the beat counter (typically connected to a metro)
 
 #### Right Inlet
 
-- **Symbol**: Send a single chord symbol (e.g., "C", "Dm7b5", "G#7", Bb6)
-- **List**: Send a sequence of chords with durations (e.g., "C . . | Dm7 . | G7 . . . ")
+- **Symbol**: Send a single chord symbol (e.g., `[C(`, `[Dm7b5(`, `[G#7(`, `[Bb6(`)
+- **List**: Send a sequence of chords with durations (e.g., `[C( . . | [Dm7( . | [G7( . . .`)
   - Format: `chord [. . .] | [chord [. . .]] | ...`
+  - Example (A Foggy Day):
+    ```
+    [Fmaj7( . . . | [Gm7( . [C7( . | [Fmaj7( . . . | [Gm7( . [C7( . | [F7( . . . | [Bb7( . . . | [Am7( . [D7( . | [Gm7( . [C7( .
+    ```
   - Bar markers (|) separate measures
   - **Timing behavior**:
     - **Without dot notation**: When no dots are used in a bar, the beats are distributed evenly among the chords in that bar. For example, in 4/4 time, if a bar contains two chords, each chord gets 2 beats.
     - **With dot notation**: As soon as dot notation is present in a bar behavior switches to this: Each chord starts with a duration of 1 beat, and each dot (.) after a chord extends its duration by 1 beat. This allows for precise control over chord durations within a bar.
-- **time [value]**: Set the time signature (e.g., "time 4" for 4/4) 
+- **time [value]**: Set the time signature (e.g., `[time 4(` for 4/4) 
 
 ### Outputs
 
