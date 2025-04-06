@@ -28,9 +28,9 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 - **Symbol**: Send a single chord symbol (e.g., `[C(`, `[Dm7b5(`, `[G#7(`, `[Bb6(`)
 - **List**: Send a sequence of chords with durations (e.g., `[C( . . | [Dm7( . | [G7( . . .`)
   - Format: `chord [. . .] | [chord [. . .]] | ...`
-  - Example (A Foggy Day):
+  - Example:
     ```
-    [Fmaj7( . . . | [Gm7( . [C7( . | [Fmaj7( . . . | [Gm7( . [C7( . | [F7( . . . | [Bb7( . . . | [Am7( . [D7( . | [Gm7( . [C7( .
+    [Ebmaj7 Eb7 Ab6 . | Ebmaj7 Eb7 Ab6 . | Bbm7 Eb13 | Bbm7 E9#11 Eb9 A7b5 | Abmaj7 | Db9#11 | Gm7 C7b9 | Fm11 Bb7 | Eb13 Ab9 | Eb13 | Ab11(
     ```
   - Bar markers (|) separate measures
   - **Timing behavior**:
