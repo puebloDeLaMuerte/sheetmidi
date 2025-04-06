@@ -25,7 +25,7 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 
 #### Right Inlet
 
-- **Symbol**: Send a single chord symbol (e.g., "C", "Dm7", "G7")
+- **Symbol**: Send a single chord symbol (e.g., "C", "Dm7b5", "G#7", Bb6)
 - **List**: Send a sequence of chords with durations (e.g., "C . . | Dm7 . | G7 . . . ")
   - Format: `chord [. . .] | [chord [. . .]] | ...`
   - Bar markers (|) separate measures
@@ -53,7 +53,9 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 
 #### Prerequisites
 
-- Pure Data development headers
+- Pure Data development headers (`m_pd.h`)
+  - Download from [Pure Data's repository](https://github.com/pure-data/pure-data/blob/master/src/m_pd.h)
+  - Place in `src/include/m_pd.h`
 - C compiler (gcc, clang, or MSVC)
 - Make
 
@@ -65,15 +67,27 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
    cd sheetmidi
    ```
 
-2. Build the external:
+2. Get Pure Data header:
+   - Download `m_pd.h` from [Pure Data's repository](https://github.com/pure-data/pure-data/blob/master/src/m_pd.h)
+   - Place it in the `src/include` directory (the directory will be present after cloning)
+
+3. Build the external:
    ```
    make
    ```
 
-3. Install the external:
+The compiled external will be in the `lib` directory. You have two options to make it available to Pure Data:
+
+1. Copy it to your Pure Data externals folder:
+   - macOS: `~/Library/Pd/externals/`
+   - Linux: `~/.pd-externals/`
+   - Windows: `C:\Program Files\Pd\extra\`
+
+2. Add the path to Pure Data's startup flags:
    ```
-   make install
+   -path /Path/To/sheetmidi/lib
    ```
+   (This is what worked for me, using )Pd-L2Ork)
 
 ## License
 
