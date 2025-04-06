@@ -77,6 +77,15 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
     if (str[pos] == 'm') {
         third = 3;  // Minor third
         pos++;
+        // Check for 'min' or 'mi'
+        if (strncmp(&str[pos], "in", 2) == 0) {
+            pos += 2;
+        } else if (str[pos] == 'i') {
+            pos++;
+        }
+    } else if (str[pos] == 'M' && str[pos + 1] == 'I') {
+        third = 3;  // Minor third
+        pos += 2;
     } else if (strncmp(&str[pos], "dim", 3) == 0) {
         third = 3;  // Minor third
         fifth = 6;  // Diminished fifth
@@ -99,9 +108,11 @@ t_chord_data parse_chord_symbol(t_symbol *sym) {
         } else if (str[pos] == '#') {
             modifier = 1;
             pos++;
-        } else if (strncmp(&str[pos], "maj", 3) == 0 || str[pos] == 'M') {
+        } else if (strncmp(&str[pos], "maj", 3) == 0 || strncmp(&str[pos], "MAJ", 3) == 0 || 
+                   strncmp(&str[pos], "Maj", 3) == 0 || strncmp(&str[pos], "MA", 2) == 0) {
             modifier = 1;
-            pos += (str[pos] == 'M' ? 1 : 3);
+            // Advance position by 2 if "MA" was matched, or 3 if "maj"/"MAJ"/"Maj" was matched
+            pos += (strncmp(&str[pos], "MA", 2) == 0 ? 2 : 3);
         }
         
         while (isdigit(str[pos])) {

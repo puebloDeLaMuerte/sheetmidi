@@ -1,6 +1,6 @@
 # SheetMidi
 
-A Pure Data external that converts a string (list in pd) of chord symbols into MIDI note numbers. Specify Chords, bars, chord-durations in beats and get midi note numbers for root, third, fifth, allnotes and randomnote from the current chord. advance time by sending '[tick(' to the object. May the algorithmic composing begin!)]
+A Pure Data external that converts a string (list in pd) of chord symbols into MIDI note numbers. Specify Chords, bars, chord-durations in beats and get midi note numbers for root, third, fifth, allnotes and randomnote from the current chord. advance time by sending tick as a message to the object. May the algorithmic composing begin!
 
 ## Features
 
@@ -26,7 +26,7 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 #### Right Inlet
 
 - **Symbol**: Send a single chord symbol (e.g., `[C(`, `[Dm7b5(`, `[G#7(`, `[Bb6(`)
-- **List**: Send a sequence of chords with durations (e.g., `[C( . . | [Dm7( . | [G7( . . .`)
+- **List**: Send a sequence of chords with durations
   - Format: `chord [. . .] | [chord [. . .]] | ...`
   - Example:
     ```
