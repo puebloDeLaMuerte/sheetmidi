@@ -1,10 +1,10 @@
-#include "include/m_pd.h"
+#include "m_pd.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include "include/p_sheetmidi.h"
-#include "include/chord_data.h"
-#include "include/token_handler.h"
+#include "p_sheetmidi.h"
+#include "chord_data.h"
+#include "token_handler.h"
 
 EXTERN void pd_init(t_pd *x);
 
@@ -173,29 +173,12 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
     
     clear_events(x);
     
-    // First pass: count events
+    // First pass: count actual events (chords only, not dots)
     int num_events = 0;
-    int current_bar_start = 0;
-    int chords_in_current_bar = 0;
-    
     for (int i = 0; i < argc; i++) {
         token_t token = atom_to_token(&argv[i]);
-        
-        switch (token.type) {
-            case TOKEN_CHORD:
-            case TOKEN_DOT:
-                num_events++;
-                chords_in_current_bar++;
-                break;
-            case TOKEN_BAR:
-                if (chords_in_current_bar > 0) {
-                    chords_in_current_bar = 0;
-                    current_bar_start = num_events;
-                }
-                break;
-            case TOKEN_ERROR:
-                post("SheetMidi: Error parsing token at position %d", i);
-                return 0;
+        if (token.type == TOKEN_CHORD) {
+            num_events++;
         }
     }
     
@@ -207,22 +190,39 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
     }
     x->num_events = num_events;
     
-    // Second pass: create events
+    // Second pass: create events and handle dots
     int event_idx = 0;
-    current_bar_start = 0;
-    chords_in_current_bar = 0;
+    int current_bar_start = 0;
+    int chords_in_current_bar = 0;
+    int current_chord_dots = 0;  // Dots for current chord being processed
+    int bar_has_dots = 0;       // Whether current bar uses dot notation
     t_symbol *last_chord = NULL;
+    
+    post("SheetMidi DEBUG: Starting second pass parsing");
     
     for (int i = 0; i < argc; i++) {
         token_t token = atom_to_token(&argv[i]);
         
         switch (token.type) {
             case TOKEN_CHORD:
+                // If we had a previous chord in this bar, finalize its duration
+                if (last_chord && chords_in_current_bar > 0) {
+                    if (bar_has_dots) {
+                        x->events[event_idx - 1].duration = 1 + current_chord_dots;
+                        post("SheetMidi DEBUG: Set previous chord duration to %d (1 + %d dots)", 
+                             x->events[event_idx - 1].duration, current_chord_dots);
+                    }
+                }
+                
+                // Add new chord event
                 x->events[event_idx].chord = token.value;
                 x->events[event_idx].parsed = parse_chord_symbol(token.value);
+                x->events[event_idx].duration = 1;  // Default duration, may be modified later
                 last_chord = token.value;
+                current_chord_dots = 0;  // Reset dot count for new chord
                 chords_in_current_bar++;
                 event_idx++;
+                post("SheetMidi DEBUG: Added chord %s at index %d", token.value->s_name, event_idx - 1);
                 break;
                 
             case TOKEN_DOT:
@@ -231,22 +231,37 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
                     clear_events(x);
                     return 0;
                 }
-                x->events[event_idx].chord = last_chord;
-                x->events[event_idx].parsed = parse_chord_symbol(last_chord);
-                chords_in_current_bar++;
-                event_idx++;
+                current_chord_dots++;
+                bar_has_dots = 1;
+                post("SheetMidi DEBUG: Added dot to chord %s, dot count now %d", 
+                     last_chord->s_name, current_chord_dots);
                 break;
                 
             case TOKEN_BAR:
                 if (chords_in_current_bar > 0) {
-                    distribute_beats_in_bar(x->events, current_bar_start, 
-                                         chords_in_current_bar, x->time_signature);
+                    // Finalize last chord in bar
+                    if (bar_has_dots) {
+                        x->events[event_idx - 1].duration = 1 + current_chord_dots;
+                        post("SheetMidi DEBUG: Bar with dots - final chord duration %d", 
+                             x->events[event_idx - 1].duration);
+                    } else {
+                        post("SheetMidi DEBUG: Bar without dots - distributing beats among %d chords", 
+                             chords_in_current_bar);
+                        distribute_beats_in_bar(x->events, current_bar_start, 
+                                             chords_in_current_bar, x->time_signature);
+                    }
+                    
+                    // Reset for next bar
                     current_bar_start = event_idx;
                     chords_in_current_bar = 0;
+                    current_chord_dots = 0;
+                    bar_has_dots = 0;
+                    post("SheetMidi DEBUG: Bar marker - resetting counters");
                 }
                 break;
                 
             case TOKEN_ERROR:
+                post("SheetMidi DEBUG: Error token encountered");
                 clear_events(x);
                 return 0;
         }
@@ -254,8 +269,16 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
     
     // Handle last bar if it wasn't terminated
     if (chords_in_current_bar > 0) {
-        distribute_beats_in_bar(x->events, current_bar_start, 
-                              chords_in_current_bar, x->time_signature);
+        if (bar_has_dots) {
+            x->events[event_idx - 1].duration = 1 + current_chord_dots;
+            post("SheetMidi DEBUG: Final bar (with dots) - last chord duration %d", 
+                 x->events[event_idx - 1].duration);
+        } else {
+            post("SheetMidi DEBUG: Final bar (without dots) - distributing beats among %d chords", 
+                 chords_in_current_bar);
+            distribute_beats_in_bar(x->events, current_bar_start, 
+                                  chords_in_current_bar, x->time_signature);
+        }
     }
     
     // Calculate total duration
@@ -263,6 +286,9 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
     for (int i = 0; i < x->num_events; i++) {
         x->total_duration += x->events[i].duration;
     }
+    
+    post("SheetMidi DEBUG: Parsing complete - %d events, total duration %d beats", 
+         x->num_events, x->total_duration);
     
     return 1;
 }
