@@ -69,10 +69,7 @@ Examples of valid chord symbols:
 ### Pre-built Binaries
 
 1. Download the appropriate binary for your platform from the releases page
-2. Place the binary in your Pure Data externals folder:
-   - macOS: `~/Library/Pd/externals/`
-   - Linux: `~/.pd-externals/`
-   - Windows: `C:\Program Files\Pd\extra\`
+2. See below for how to make external available in pd
 
 ### Building from Source
 
@@ -110,7 +107,7 @@ The compiled external will be in the `lib` directory. You have two options to ma
    ```
    -path /Path/To/sheetmidi/lib
    ```
-   (This is what worked for me, using )Pd-L2Ork)
+   (This second approach is what worked for me, using Pd-L2Ork)
 
 ## License
 

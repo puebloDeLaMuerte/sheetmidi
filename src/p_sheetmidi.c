@@ -18,6 +18,8 @@ static void clear_events(t_p_sheetmidi *x);
 static void distribute_beats_in_bar(t_chord_event *events, int start_idx, int count, int time_sig);
 static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv);
 static void print_parsed_sequence(t_p_sheetmidi *x);
+static t_chord_event* get_current_event(t_p_sheetmidi *x);
+static void output_debug_chord(t_p_sheetmidi *x, t_chord_event *ev);
 void p_sheetmidi_note(t_p_sheetmidi *x);
 void p_sheetmidi_tick(t_p_sheetmidi *x);
 void p_sheetmidi_root(t_p_sheetmidi *x);
@@ -66,6 +68,7 @@ void p_sheetmidi_proxy_anything(t_p_sheetmidi_proxy *p, t_symbol *s, int argc, t
                 // Wrap around using modulo
                 p->x->current_beat = ((int)new_beat % p->x->total_duration + p->x->total_duration) % p->x->total_duration;
                 debug_post(p->x, "SheetMidi DEBUG: Beat reset to %d", p->x->current_beat);
+                output_debug_chord(p->x, get_current_event(p->x));
             }
         }
         return;
@@ -392,6 +395,7 @@ void p_sheetmidi_tick(t_p_sheetmidi *x) {
     if (x->current_beat >= x->total_duration) {
         x->current_beat = 0;
     }
+    output_debug_chord(x, get_current_event(x));
 }
 
 void *p_sheetmidi_new(t_symbol *s, int argc, t_atom *argv) {
