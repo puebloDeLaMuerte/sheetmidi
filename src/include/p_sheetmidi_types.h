@@ -24,6 +24,7 @@ typedef struct _p_sheetmidi {
     
     // Playback members
     t_outlet *note_outlet;     // Outlet for current note value
+    t_outlet *beat_outlet;     // Outlet for current beat position
     t_outlet *debug_outlet;    // Outlet for chord symbols
     int current_beat;          // Current playback position in beats
 } t_p_sheetmidi;

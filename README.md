@@ -22,6 +22,7 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 - `[third(`: Outputs the third note of the current chord
 - `[fifth(`: Outputs the fifth note of the current chord
 - `[tick(`: Advances the beat counter (typically connected to a metro)
+- `[beat n(`: Resets the beat counter to position n and outputs the new position
 
 #### Right Inlet
 
@@ -62,7 +63,15 @@ Examples of valid chord symbols:
 ### Outputs
 
 - **Left outlet**: MIDI note values (0-127)
+- **Middle outlet**: Current beat position (integer)
 - **Right outlet**: Chord symbols for debugging
+
+The beat position is output when:
+- A new chord sequence is parsed (initial position)
+- The `[tick(` message is received (advancing position)
+- The `[beat n(` message is received in the left inlet (resetting position)
+
+Note: The beat position is NOT output when receiving a `[beat n(` message in the right inlet.
 
 ## Installation
 

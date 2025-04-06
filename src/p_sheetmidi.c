@@ -38,6 +38,21 @@ void p_sheetmidi_bang(t_p_sheetmidi *x) {
     print_parsed_sequence(x);
 }
 
+// Add function to output beat position
+static void output_beat_position(t_p_sheetmidi *x) {
+    outlet_float(x->beat_outlet, x->current_beat);
+}
+
+// Add function to handle beat resetting
+static void reset_beat(t_p_sheetmidi *x, t_float new_beat) {
+    if (x->total_duration > 0) {
+        // Wrap around using modulo
+        x->current_beat = ((int)new_beat % x->total_duration + x->total_duration) % x->total_duration;
+        debug_post(x, "SheetMidi DEBUG: Beat reset to %d", x->current_beat);
+        output_debug_chord(x, get_current_event(x));
+    }
+}
+
 // Update proxy class to handle both symbol and list input
 void p_sheetmidi_proxy_anything(t_p_sheetmidi_proxy *p, t_symbol *s, int argc, t_atom *argv) {
     if (!p || !p->x) return;
@@ -63,13 +78,7 @@ void p_sheetmidi_proxy_anything(t_p_sheetmidi_proxy *p, t_symbol *s, int argc, t
     // Handle beat reset
     if (s == gensym("beat")) {
         if (argc > 0 && argv[0].a_type == A_FLOAT) {
-            t_float new_beat = atom_getfloat(&argv[0]);
-            if (p->x->total_duration > 0) {
-                // Wrap around using modulo
-                p->x->current_beat = ((int)new_beat % p->x->total_duration + p->x->total_duration) % p->x->total_duration;
-                debug_post(p->x, "SheetMidi DEBUG: Beat reset to %d", p->x->current_beat);
-                output_debug_chord(p->x, get_current_event(p->x));
-            }
+            reset_beat(p->x, atom_getfloat(&argv[0]));
         }
         return;
     }
@@ -308,6 +317,9 @@ static int parse_chord_sequence(t_p_sheetmidi *x, int argc, t_atom *argv) {
     debug_post(x, "SheetMidi DEBUG: Parsing complete - %d events, total duration %d beats", 
          x->num_events, x->total_duration);
     
+    // Output initial beat position after parsing
+    output_beat_position(x);
+    
     return 1;
 }
 
@@ -396,6 +408,13 @@ void p_sheetmidi_tick(t_p_sheetmidi *x) {
         x->current_beat = 0;
     }
     output_debug_chord(x, get_current_event(x));
+    output_beat_position(x);
+}
+
+// Add beat handler for left inlet
+void p_sheetmidi_beat(t_p_sheetmidi *x, t_float f) {
+    reset_beat(x, f);
+    output_beat_position(x);
 }
 
 void *p_sheetmidi_new(t_symbol *s, int argc, t_atom *argv) {
@@ -424,6 +443,7 @@ void *p_sheetmidi_new(t_symbol *s, int argc, t_atom *argv) {
     }
     
     x->note_outlet = outlet_new(&x->x_obj, &s_float);
+    x->beat_outlet = outlet_new(&x->x_obj, &s_float);  // Add new beat position outlet
     x->debug_outlet = outlet_new(&x->x_obj, &s_symbol);
     
     return (void *)x;
@@ -469,6 +489,13 @@ EXTERN void p_sheetmidi_setup(void) {
     class_addmethod(p_sheetmidi_class, 
                    (t_method)p_sheetmidi_tick, 
                    gensym("tick"), 0);
+    
+    // Add beat method to handle beat messages in left inlet
+    class_addmethod(p_sheetmidi_class,
+                   (t_method)p_sheetmidi_beat,
+                   gensym("beat"),
+                   A_FLOAT,
+                   0);
     
     info_post("SheetMidi: external loaded");
 }
