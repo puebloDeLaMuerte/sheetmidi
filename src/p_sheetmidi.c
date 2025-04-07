@@ -400,6 +400,67 @@ void p_sheetmidi_fifth(t_p_sheetmidi *x) {
     outlet_float(x->note_outlet, note);
 }
 
+
+// Method to handle "all" message - outputs all possible notes in the current chord
+void p_sheetmidi_all(t_p_sheetmidi *x) {
+    if (!x) {
+        return;
+    }
+    
+    if (x->num_events == 0) {
+        return;
+    }
+    
+    t_chord_event *ev = get_current_event(x);
+    if (!ev) {
+        return;
+    }
+    
+    // Get the current chord data
+    t_chord_data *chord = &ev->parsed;
+    
+    // Validate chord data
+    if (chord->num_intervals < 0 || chord->num_intervals > 12) {
+        return;
+    }
+    
+    // Calculate max number of notes (11 octaves per interval)
+    int max_notes = chord->num_intervals * 11;
+    
+    // Allocate memory for output list - ensure we have enough space
+    t_atom *output_list = (t_atom *)getbytes(max_notes * sizeof(t_atom));
+    if (!output_list) {
+        return;
+    }
+    
+    int list_index = 0;
+    
+    // Process each interval one at a time
+    for (int i = 0; i < chord->num_intervals; i++) {
+        // Calculate base note for this interval
+        t_float base_note = chord->root_offset + chord->intervals[i];
+        
+        // Normalize to 0-11 range
+        while (base_note >= 12) base_note -= 12;
+        while (base_note < 0) base_note += 12;
+        
+        // Add notes for all octaves
+        for (int octave = 0; octave < 11 && list_index < max_notes; octave++) {
+            t_float note = base_note + (octave * 12);
+            if (note < 128) { // Valid MIDI range
+                SETFLOAT(&output_list[list_index], note);
+                list_index++;
+            }
+        }
+    }
+    
+    // Output the complete list
+    outlet_list(x->list_outlet, 0, list_index, output_list);
+    
+    // Free the allocated memory
+    freebytes(output_list, max_notes * sizeof(t_atom));
+}
+
 void p_sheetmidi_tick(t_p_sheetmidi *x) {
     if (x->num_events == 0) return;
     
@@ -443,6 +504,7 @@ void *p_sheetmidi_new(t_symbol *s, int argc, t_atom *argv) {
     }
     
     x->note_outlet = outlet_new(&x->x_obj, &s_float);
+    x->list_outlet = outlet_new(&x->x_obj, &s_list);  // Add new list outlet
     x->beat_outlet = outlet_new(&x->x_obj, &s_float);  // Add new beat position outlet
     x->debug_outlet = outlet_new(&x->x_obj, &s_symbol);
     
@@ -495,6 +557,12 @@ EXTERN void p_sheetmidi_setup(void) {
                    (t_method)p_sheetmidi_beat,
                    gensym("beat"),
                    A_FLOAT,
+                   0);
+    
+    // Add "all" method
+    class_addmethod(p_sheetmidi_class,
+                   (t_method)p_sheetmidi_all,
+                   gensym("all"),
                    0);
     
     info_post("SheetMidi: external loaded");
