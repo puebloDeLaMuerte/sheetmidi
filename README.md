@@ -10,17 +10,21 @@ A Pure Data external that converts a string (list in pd) of chord symbols into M
 - Debug output for monitoring current chord
 - Support for complex chord symbols (e.g., Cmaj7, Dm7b5, G6, C#m7#9)
 
-## Usage in Pure Data
+## Outlets
 
-### Input Commands
+1. Left outlet (note_outlet): Outputs single MIDI note values
+2. Middle outlet (list_outlet): Outputs lists of MIDI notes (used for [all( command)
+3. Right outlet (beat_outlet): Outputs current beat position
+4. Far right outlet (debug_outlet): Outputs chord symbols when debug is enabled
 
-#### Main Inlet (Left)
+## Input Commands
 
-- `[bang(`: Outputs information about the current chord sequence
-- `[note(`: Outputs a random note from the current chord
-- `[root(`: Outputs the root note of the current chord
-- `[third(`: Outputs the third note of the current chord
-- `[fifth(`: Outputs the fifth note of the current chord
+- `[bang(`: Output the current note value
+- `[note(`: Output the current note value
+- `[root(`: Output the root note of the current chord
+- `[third(`: Output the third note of the current chord
+- `[fifth(`: Output the fifth note of the current chord
+- `[all(`: Output a list of all possible MIDI notes (0-127) that are part of the current chord through the list outlet
 - `[tick(`: Advances the beat counter (typically connected to a metro)
 - `[beat n(`: Resets the beat counter to position n and outputs the new position
 
@@ -60,19 +64,6 @@ Examples of valid chord symbols:
 - `Bb7#11` (B-flat seventh sharp eleven)
 - `C#dim` (C-sharp diminished)
 
-### Outputs
-
-- **Left outlet**: MIDI note values (0-127)
-- **Middle outlet**: Current beat position (integer)
-- **Right outlet**: Chord symbols for debugging
-
-The beat position is output when:
-- A new chord sequence is parsed (initial position)
-- The `[tick(` message is received (advancing position)
-- The `[beat n(` message is received in the left inlet (resetting position)
-
-Note: The beat position is NOT output when receiving a `[beat n(` message in the right inlet.
-
 ## Installation
 
 ### Pre-built Binaries
@@ -92,62 +83,3 @@ Note: The beat position is NOT output when receiving a `[beat n(` message in the
 
 1. Clone the repository:
    ```
-   git clone https://github.com/puebloDeLaMuerte/sheetmidi.git
-   cd sheetmidi
-   ```
-
-2. Get Pure Data header:
-   - Download `m_pd.h` from [Pure Data's repository](https://github.com/pure-data/pure-data/blob/master/src/m_pd.h)
-   - Place it in the `src/include` directory (the directory will be present after cloning)
-
-3. Build the external:
-   ```
-   make
-   ```
-
-The compiled external will be in the `lib` directory. You have two options to make it available to Pure Data:
-
-1. Copy it to your Pure Data externals folder:
-   - macOS: `~/Library/Pd/externals/`
-   - Linux: `~/.pd-externals/`
-   - Windows: `C:\Program Files\Pd\extra\`
-
-2. Add the path to Pure Data's startup flags:
-   ```
-   -path /Path/To/sheetmidi/lib
-   ```
-   (This second approach is what worked for me, using Pd-L2Ork)
-
-## License
-
-GNU Lesser General Public License (LGPL) v3
-
-Copyright (c) 2024 Philipp Tögel
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Lesser General Public License for more details.
-
-This means you can:
-- Use SheetMidi in any project (including commercial projects)
-- Modify the code
-- Distribute the code
-- Link to SheetMidi from other software (including proprietary software)
-
-But you must:
-- Share any modifications to SheetMidi itself under LGPL
-- Not sell SheetMidi as a standalone proprietary product
-- Include the LGPL license and copyright notice with any distribution
-
-For the full license text, see <https://www.gnu.org/licenses/lgpl-3.0.en.html>
-
-## Author
-
-Philipp Tögel, Berlin
-
