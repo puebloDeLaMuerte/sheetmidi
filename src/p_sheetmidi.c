@@ -400,6 +400,14 @@ void p_sheetmidi_fifth(t_p_sheetmidi *x) {
     outlet_float(x->note_outlet, note);
 }
 
+// Comparison function for qsort
+static int compare_atoms(const void *a, const void *b) {
+    t_float val_a = atom_getfloat((t_atom *)a);
+    t_float val_b = atom_getfloat((t_atom *)b);
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
 
 // Method to handle "all" message - outputs all possible notes in the current chord
 void p_sheetmidi_all(t_p_sheetmidi *x) {
@@ -453,6 +461,9 @@ void p_sheetmidi_all(t_p_sheetmidi *x) {
             }
         }
     }
+    
+    // Sort the list before output
+    qsort(output_list, list_index, sizeof(t_atom), compare_atoms);
     
     // Output the complete list
     outlet_list(x->list_outlet, 0, list_index, output_list);
